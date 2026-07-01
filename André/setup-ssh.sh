@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PEER_HOST="${PEER_HOST:-andre.local}"
+PEER_HOST="${PEER_HOST:-abraham.local}"
 
 KEY="${HOME}/.ssh/id_ed25519"
 
@@ -20,9 +20,9 @@ echo ""
 echo "==> Paso manual: comparte tu clave pública por AirDrop"
 echo "    Archivo a enviar: ${KEY}.pub"
 echo "    Abre Finder, ve a ~/.ssh, arrastra id_ed25519.pub al ícono de AirDrop"
-echo "    del Mac de André. NO se pide contraseña, solo aceptar la transferencia."
+echo "    del Mac de Abraham. NO se pide contraseña, solo aceptar la transferencia."
 echo ""
-echo "==> Cuando recibas la clave pública de André por AirDrop, agrégala a tu propio authorized_keys:"
+echo "==> Cuando recibas la clave pública de Abraham por AirDrop, agrégala a tu propio authorized_keys:"
 echo "    cat ~/Downloads/id_ed25519.pub >> ~/.ssh/authorized_keys"
 echo "    chmod 600 ~/.ssh/authorized_keys"
 echo ""

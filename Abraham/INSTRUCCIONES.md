@@ -1,6 +1,6 @@
 # Abraham — Nodo maestro (macOS)
 
-Abraham es el **nodo maestro** del clúster. Desde aquí se instala el stack MPI/Python, se configura SSH sin contraseña hacia los workers y se lanzan los jobs distribuidos.
+Abraham es el **nodo maestro** del clúster de 2 nodos. Instala el stack MPI/Python, establece confianza SSH con André sin usar contraseñas cruzadas, sincroniza `shared/` en tiempo real con Syncthing, y lanza los jobs MPI.
 
 ## Rol
 
@@ -8,59 +8,52 @@ Abraham es el **nodo maestro** del clúster. Desde aquí se instala el stack MPI
 |---|---|
 | Sistema | macOS |
 | Rol | Maestro (orquestador MPI) |
-| Workers | André (macOS), Alex (WSL2 Ubuntu) |
+| Worker | André (macOS) |
 
-## Prerrequisitos
+## Red
 
-- macOS con acceso a terminal
-- Conexión a red local con André y Alex
-- IPs estáticas o reservadas en el router (editar `hostfile` con las IPs reales)
+1. Conectar ambos Macs a la **misma red**: hotspot móvil (principal) o Ethernet + Compartir Internet desde Abraham (plan B).
+2. Verificar resolución mDNS: `ping andre.local` debe responder sin pérdida.
 
-## Instalación (ejecutar en orden)
+## Instalación
 
 ```bash
 cd ~/cluster-py-mpi/Abraham
-chmod +x install.sh verify.sh setup-ssh.sh run-hello.sh run-vector-sum.sh
+chmod +x install.sh verify.sh setup-ssh.sh setup-syncthing.sh run-hello.sh run-vector-sum.sh
 ./install.sh
 ./verify.sh
 ```
 
-## Configuración SSH hacia workers
-
-Edita las variables al inicio de `setup-ssh.sh` con el usuario e IP de cada worker, luego:
+## SSH sin contraseñas cruzadas
 
 ```bash
 ./setup-ssh.sh
 ```
 
-Comandos manuales equivalentes:
+El script activa Remote Login localmente, genera tu clave SSH, y te guía para intercambiar la clave pública con André **por AirDrop** (nunca se pide la contraseña del otro Mac). Al final prueba `ssh andre.local hostname` sin prompt.
+
+## Sincronizar `shared/` en tiempo real
 
 ```bash
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
-ssh-copy-id -i ~/.ssh/id_ed25519.pub USUARIO@IP_ANDRE
-ssh-copy-id -i ~/.ssh/id_ed25519.pub USUARIO@IP_ALEX
-ssh USUARIO@IP_ANDRE hostname
-ssh USUARIO@IP_ALEX hostname
+./setup-syncthing.sh
 ```
 
-## Sincronizar proyecto en todos los nodos
-
-Copia la carpeta `shared/` a la misma ruta en cada nodo (`~/cluster-py-mpi/shared/`):
-
-```bash
-rsync -avz ../shared/ USUARIO@IP_ANDRE:~/cluster-py-mpi/shared/
-rsync -avz ../shared/ USUARIO@IP_ALEX:~/cluster-py-mpi/shared/
-```
+Instala y arranca Syncthing, y te guía para emparejar con André por Device ID y compartir la carpeta `shared/` en modo Send & Receive. Una vez emparejado, cualquier cambio en `shared/` en cualquiera de los 2 Macs se refleja automáticamente en el otro en segundos.
 
 ## Configurar hostfile
 
-Edita `hostfile` con las IPs reales de Abraham, André y Alex:
+```bash
+cp hostfile.example hostfile
+```
+
+`hostfile` ya usa hostnames `.local`, no requiere editar IPs:
 
 ```txt
-IP_ABRAHAM slots=2
-IP_ANDRE slots=2
-IP_ALEX slots=2
+abraham.local slots=2
+andre.local slots=2
 ```
+
+Ajusta `slots` según núcleos reales: `sysctl -n hw.logicalcpu`.
 
 ## Validación
 
@@ -68,15 +61,13 @@ IP_ALEX slots=2
 ./verify.sh
 mpirun --version
 python3 -c "from mpi4py import MPI; print(MPI.Get_version())"
-ssh USUARIO@IP_ANDRE "mpirun --version"
-ssh USUARIO@IP_ALEX "mpirun --version"
+ssh andre.local "mpirun --version"
 ```
 
 ## Ejecutar programas MPI
 
-Desde la carpeta `shared/`:
-
 ```bash
+cd ../shared
 ./run-hello.sh
 ./run-vector-sum.sh
 ```
@@ -84,23 +75,18 @@ Desde la carpeta `shared/`:
 O manualmente:
 
 ```bash
-cd ../shared
-mpirun -np 6 --hostfile ../Abraham/hostfile python3 hello_mpi.py
-mpirun -np 6 --hostfile ../Abraham/hostfile python3 vector_sum.py
+mpirun -np 4 --hostfile ../Abraham/hostfile python3 hello_mpi.py
+mpirun -np 4 --hostfile ../Abraham/hostfile python3 vector_sum.py
 ```
-
-## Restricción de heterogeneidad
-
-Open MPI **no garantiza** jobs MPI heterogéneos (macOS nativo + Linux/WSL2 en el mismo job). Para clase:
-
-1. **Opción A (recomendada):** jobs solo entre nodos macOS (Abraham + André); Alex como worker alternativo en jobs Linux-only.
-2. **Opción B:** los 3 nodos con la misma versión de Open MPI y pruebas incrementales; si falla con errores de tipo de datos, ejecutar solo en nodos homogéneos.
 
 ## Checklist de aceptación
 
+- [ ] Hotspot móvil (o Ethernet+ICS) activo, ambos Macs conectados
+- [ ] `ping andre.local` responde sin pérdida
 - [ ] `brew install` completado sin errores
 - [ ] `mpi4py` importa correctamente
-- [ ] SSH sin contraseña a André y Alex
-- [ ] `hostfile` con IPs correctas
-- [ ] `hello_mpi.py` muestra 6 procesos en distintos hostnames
-- [ ] `vector_sum.py` produce suma correcta
+- [ ] SSH sin contraseña hacia André, sin haber usado `ssh-copy-id`
+- [ ] Syncthing: carpeta `shared` "Up to Date" en ambos nodos
+- [ ] Editar un archivo en `shared/` se refleja en André en segundos
+- [ ] `hello_mpi.py` muestra procesos en `abraham.local` y `andre.local`
+- [ ] `vector_sum.py` produce la suma correcta
